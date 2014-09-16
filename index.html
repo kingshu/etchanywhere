@@ -1,0 +1,256 @@
+<!DOCTYPE HTML>
+<html>
+   <head>
+   <title>Etch</title>
+   
+   <link rel="stylesheet" type="text/css" href="style.css">
+   <script src="//ajax.googleapis.com/ajax/libs/jquery/1.4.3/jquery.min.js"></script>
+
+   <script>
+
+      function handleFileSelect(evt) {
+          var files = evt.target.files; // FileList object
+
+          // Loop through the FileList and render image files as thumbnails.
+          for (var i = 0, f; f = files[i]; i++) {
+
+            // Only process image files.
+            if (!f.type.match('image.*')) {
+              continue; 
+            }
+
+            var reader = new FileReader();
+
+            // Closure to capture the file information.
+            reader.onload = (function(theFile) {
+              return function(e) {
+            
+              $('#inputBtn').remove();
+
+                var canvas = document.getElementById('canvasSignature');
+                canvas.width = Math.max( window.innerWidth, document.body.clientWidth ); //document.width is obsolete
+                canvas.height = Math.max( window.innerHeight, document.body.clientHeight )-170; //document.width is obsolete
+            
+                var context = canvas.getContext('2d');
+  
+                // load image from data url
+                var imageObj = new Image();
+                imageObj.onload = function() {
+                  context.drawImage(this, 0, 0, Math.max( window.innerWidth, document.body.clientWidth ), Math.max( window.innerHeight, document.body.clientHeight ));
+                  $('#submit').show();
+                  $('#retake').show();
+                };
+                imageObj.src = e.target.result;
+       
+                initialize();
+
+              };
+            })(f);
+
+            // Read in the image file as a data URL.
+            reader.readAsDataURL(f);
+          }
+      }
+
+      var loaderLoop = function () {
+         window.setTimeout ( function() {
+            $('#wall').load('loader.php?lat='+$('#lat').val()+'&lon='+$('#lon').val());
+            loaderLoop();
+         }, 1000);
+      }
+
+//==========================================================//
+      $(document).ready( function() {
+
+         document.getElementById('files').addEventListener('change', handleFileSelect, false);     
+
+         if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition( function(position) {
+               $('#lat').val(position.coords.latitude); 
+               $('#lon').val(position.coords.longitude); 
+            });
+         }
+         else {
+            $('#lat').val("Unsupported");
+            $('#lon').val("Unsupported");
+         }
+
+         $('#retake').click( function() {
+            window.reload();
+         });
+
+         $('#submit').click( function() {
+            $('#submit').unbind();
+            $('#retake').unbind();
+            $('#loading').html("<img id='loading' class='overlay' src='http://www.apc.com/tools/ups_selector/resource/images/loading.gif'>");
+            var canvas = document.getElementById("canvasSignature");
+            $('#imgStr').val(canvas.toDataURL());     
+         });
+
+         loaderLoop();
+
+      });
+//=========================================================//
+
+ // works out the X, Y position of the click inside the canvas from the X, Y position on the page
+      function getPosition(mouseEvent, sigCanvas) {
+         var x, y;
+         if (mouseEvent.pageX != undefined && mouseEvent.pageY != undefined) {
+            x = mouseEvent.pageX;
+            y = mouseEvent.pageY;
+         } else {
+            x = mouseEvent.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+            y = mouseEvent.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+         }
+ 
+         return { X: x - sigCanvas.offsetLeft, Y: y - sigCanvas.offsetTop };
+      }
+ 
+      function initialize() {
+         // get references to the canvas element as well as the 2D drawing context
+         var sigCanvas = document.getElementById("canvasSignature");
+         var context = sigCanvas.getContext("2d");
+         context.strokeStyle = "#df4b26";
+       context.lineJoin = "round";
+       context.lineWidth = 10;
+         // This will be defined on a TOUCH device such as iPad or Android, etc.
+         var is_touch_device = 'ontouchstart' in document.documentElement;
+ 
+         if (is_touch_device) {
+            // create a drawer which tracks touch movements
+            var drawer = {
+               isDrawing: false,
+               touchstart: function (coors) {
+                  context.beginPath();
+                  context.moveTo(coors.x, coors.y);
+                  this.isDrawing = true;
+               },
+               touchmove: function (coors) {
+                  if (this.isDrawing) {
+                     context.lineTo(coors.x, coors.y);
+                     context.stroke();
+                  }
+               },
+               touchend: function (coors) {
+                  if (this.isDrawing) {
+                     this.touchmove(coors);
+                     this.isDrawing = false;
+                  }
+               }
+            };
+ 
+            // create a function to pass touch events and coordinates to drawer
+            function draw(event) {
+ 
+               // get the touch coordinates.  Using the first touch in case of multi-touch
+               var coors = {
+                  x: event.targetTouches[0].pageX,
+                  y: event.targetTouches[0].pageY
+               };
+ 
+               // Now we need to get the offset of the canvas location
+               var obj = sigCanvas;
+ 
+               if (obj.offsetParent) {
+                  // Every time we find a new object, we add its offsetLeft and offsetTop to curleft and curtop.
+                  do {
+                     coors.x -= obj.offsetLeft;
+                     coors.y -= obj.offsetTop;
+                  }
+              // The while loop can be "while (obj = obj.offsetParent)" only, which does return null
+              // when null is passed back, but that creates a warning in some editors (i.e. VS2010).
+                  while ((obj = obj.offsetParent) != null);
+               }
+ 
+               // pass the coordinates to the appropriate handler
+               drawer[event.type](coors);
+            }
+ 
+
+            // attach the touchstart, touchmove, touchend event listeners.
+            sigCanvas.addEventListener('touchstart', draw, false);
+            sigCanvas.addEventListener('touchmove', draw, false);
+            sigCanvas.addEventListener('touchend', draw, false);
+ 
+            // prevent elastic scrolling
+            sigCanvas.addEventListener('touchmove', function (event) {
+               event.preventDefault();
+            }, false); 
+         }
+         else {
+ 
+            // start drawing when the mousedown event fires, and attach handlers to
+            // draw a line to wherever the mouse moves to
+            $("#canvasSignature").mousedown(function (mouseEvent) {
+               var position = getPosition(mouseEvent, sigCanvas);
+ 
+               context.moveTo(position.X, position.Y);
+               context.beginPath();
+ 
+               // attach event handlers
+               $(this).mousemove(function (mouseEvent) {
+                  drawLine(mouseEvent, sigCanvas, context);
+               }).mouseup(function (mouseEvent) {
+                  finishDrawing(mouseEvent, sigCanvas, context);
+               }).mouseout(function (mouseEvent) {
+                  finishDrawing(mouseEvent, sigCanvas, context);
+               });
+            });
+ 
+         }
+      }
+ 
+      // draws a line to the x and y coordinates of the mouse event inside
+      // the specified element using the specified context
+      function drawLine(mouseEvent, sigCanvas, context) {
+ 
+         var position = getPosition(mouseEvent, sigCanvas);
+ 
+         context.lineTo(position.X, position.Y);
+         context.stroke();
+      }
+ 
+      // draws a line from the last coordiantes in the path to the finishing
+      // coordinates and unbind any event handlers which need to be preceded
+      // by the mouse down event
+      function finishDrawing(mouseEvent, sigCanvas, context) {
+         // draw the line to the finishing coordinates
+         drawLine(mouseEvent, sigCanvas, context);
+ 
+         context.closePath();
+ 
+         // unbind any events which could draw
+         $(sigCanvas).unbind("mousemove")
+                     .unbind("mouseup")
+                     .unbind("mouseout");
+      }
+   </script>
+
+   </head>
+ 
+   <body>
+         <form id='form' action='save.php' method='POST'>
+         <div id='inputBtn'>
+            <input id='files' type="file" capture="camera" accept="image/*"></input>
+            <span id="imageButton" class="button green">Create an Etch!</span>
+<br><br>
+            <div id='wall'>
+
+            </div>
+         </div>      
+            <input type='hidden' name='imgStr' id='imgStr'></input>
+            <input type='hidden' name='lat' id='lat'></input> 
+            <input type='hidden' name='lon' id='lon'></input>  
+         
+         <canvas id='canvasSignature'></canvas>
+         <div id='loading'></div>
+         <table border=0 width=100%><tr>
+            <td> <button id='submit' class="button blue controls">Post </button>   </td>
+            <td> <button id='retake' class="button red controls">Delete</button> </td>
+            </tr></table>
+         </form>
+
+
+   </body>
+ 
+</html>

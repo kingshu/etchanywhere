@@ -1,0 +1,56 @@
+form {
+    position:relative;
+}
+
+.button {
+    color: white;
+    font-size: 75px;
+    font-weight: bold;
+    padding: 20px 10%;
+    width: 80%;
+    border-radius: 5px;
+    text-transform: uppercase;
+    display: inline-block;
+    text-align: center;
+}
+
+.controls {
+    display:none;
+    width:100%;
+    height=100
+}
+
+.green {
+    background: #33CC33;
+}
+.blue {
+    background: #0066FF;
+}
+.red {
+    background: #FF3300;
+}
+
+input[type="file"] {
+    opacity: 0.01;
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+}
+
+.wallimages {
+    width: 47%;
+    height: auto;
+}
+
+.overlay {
+    width:300px;
+    height:400px;
+    position:fixed;
+    top:50%;
+    left:50%;
+    margin-top:-150px; /* negative half the size of height */
+    margin-left:-150px; /* negative half the size of width */
+}
